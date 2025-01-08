@@ -10,7 +10,8 @@
 #define CMD_PAGE_PROGRAM   0x02
 #define CMD_SECTOR_ERASE   0x20
 #define CMD_READ_STATUS    0x05
-
+#define read_unique_id     0x4B
+#define manufacturing_id   0x92
 // SPI Settings
 SPISettings spiSettings(1000000, MSBFIRST, SPI_MODE0);
 
@@ -26,6 +27,14 @@ void setup() {
   uint16_t chipID = readChipID();
   Serial.print("Winbond Chip ID: 0x");
   Serial.println(chipID, HEX);
+  
+  uint16_t chipID1 = readuniqid();
+  Serial.print("Winbond Unique ID: 0x");
+  Serial.println(chipID1, HEX);
+
+  uint16_t chipID2 = manu_id();
+  Serial.print("Winbond manu_f ID: 0x");
+  Serial.println(chipID2, HEX);
 
   if (chipID == 0) {
     Serial.println("Failed to detect the memory chip!");
@@ -153,4 +162,30 @@ byte readData(uint32_t address) {
   SPI.endTransaction();
 
   return result;
+}
+
+uint16_t readuniqid(){
+  uint16_t chipID = 0;
+  digitalWrite(CS_PIN, LOW);
+  SPI.transfer(read_unique_id);
+  SPI.transfer(0x00); // Dummy bytes
+  SPI.transfer(0x00);
+  SPI.transfer(0x00);
+  SPI.transfer(0x00);
+  chipID = (SPI.transfer(0x00) << 8) | SPI.transfer(0x00);
+  digitalWrite(CS_PIN, HIGH);
+  return chipID;
+}
+
+uint16_t manu_id(){
+  uint16_t chipID = 0;
+  digitalWrite(CS_PIN, LOW);
+  SPI.transfer(manufacturing_id);
+  SPI.transfer(0x00); // Dummy bytes
+  SPI.transfer(0x00);
+  SPI.transfer(0x00);
+  SPI.transfer(0x00);
+  chipID = (SPI.transfer(0x00) << 8) | SPI.transfer(0x00);
+  digitalWrite(CS_PIN, HIGH);
+  return chipID;
 }
