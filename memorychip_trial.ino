@@ -44,7 +44,7 @@ void loop() {
 
   // Write data
   Serial.println("Writing data...");
-
+  writeData(address, dataToWrite);
 
   // Read data
   Serial.println("Reading data...");
@@ -63,7 +63,7 @@ void loop() {
 uint16_t readChipID() {
   uint16_t chipID = 0;
 
- // SPI.beginTransaction(spiSettings);
+  SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_ID);
   SPI.transfer(0x00); // Dummy bytes
@@ -80,7 +80,7 @@ uint16_t readChipID() {
 byte readStatus() {
   byte status;
 
-  //SPI.beginTransaction(spiSettings);
+  SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_STATUS);
   status = SPI.transfer(0x00);
@@ -92,7 +92,7 @@ byte readStatus() {
 
 // Function to Enable Write
 void enableWrite() {
-  //SPI.beginTransaction(spiSettings);
+  SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_WRITE_ENABLE);
   digitalWrite(CS_PIN, HIGH);
@@ -113,14 +113,16 @@ void eraseSector(uint32_t address) {
   SPI.endTransaction();
 
   // Wait for erase operation to complete
-  while (readStatus() & 0x01);
+  while (readStatus() & 0x01) {
+    delay(1);
+  }
 }
 
 // Function to Write Data
 void writeData(uint32_t address, byte data) {
   enableWrite(); // Enable write operation
 
-  //SPI.beginTransaction(spiSettings);
+  SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_PAGE_PROGRAM);
   SPI.transfer((address >> 16) & 0xFF); // Address MSB
@@ -131,14 +133,16 @@ void writeData(uint32_t address, byte data) {
   SPI.endTransaction();
 
   // Wait for write operation to complete
-  while (readStatus() & 0x01);
+  while (readStatus() & 0x01) {
+    delay(1);
+  }
 }
 
 // Function to Read Data
 byte readData(uint32_t address) {
   byte result;
 
-  //SPI.beginTransaction(spiSettings);
+  SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_DATA);
   SPI.transfer((address >> 16) & 0xFF); // Address MSB
