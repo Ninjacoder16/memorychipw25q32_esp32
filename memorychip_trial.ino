@@ -1,7 +1,7 @@
 #include <SPI.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
-
+  
 // Pin Definitions
 #define CS_PIN 5  // Chip Select (CS) pin connected to the memory chip
 
