@@ -1,4 +1,7 @@
 #include <SPI.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+
 // Pin Definitions
 #define CS_PIN 5  // Chip Select (CS) pin connected to the memory chip
 
@@ -13,7 +16,7 @@
 #define manufacturing_id 0x92
 // SPI Settings
 SPISettings spiSettings(1000000, MSBFIRST, SPI_MODE0);
-
+int temperature, humidity;
 void setup() {
   Serial.begin(115200);
 
@@ -41,24 +44,41 @@ void setup() {
     while (1)
       ;
   }
+  humidity =10;
+  temperature=10;
 }
 
 void loop() {
-  uint32_t address = 0x00000;
-  char dataToWrite[] = "Aartikanwar Solanki";
-  char buffer[20];
+  String macAddress = WiFi.macAddress();
+  StaticJsonDocument<200> doc;
+  temperature = temperature+1;
+  humidity = humidity+1;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["mac_id"] = macAddress.c_str();
+ // doc["timestamp"] = millis();  // Use system time or add RTC if available
 
-  Serial.println("Erasing sector...");
-  eraseSector(address);
+  // Serialize JSON to a string
+  char jsonBuffer[100];
+  serializeJson(doc, jsonBuffer);
+  Serial.println(jsonBuffer);
+   
+  //memory chip
+  uint32_t address = 0x00000;
+  //char dataToWrite[] = "Aartikanwar Solanki";
+  char buffer[100];
+
+  //Serial.println("Erasing sector...");
+  //eraseSector(address);
 
   Serial.println("Writing data...");
-  writeData(address, dataToWrite, strlen(dataToWrite));
+  writeData(address, jsonBuffer, strlen(jsonBuffer));
 
   Serial.println("Reading data...");
-  readData(address, buffer, strlen(dataToWrite));  //pasing empty buffer
+  readData(address, buffer, strlen(jsonBuffer));  //pasing empty buffer
 
   Serial.print("Data written: ");
-  Serial.println(dataToWrite);
+  Serial.println(jsonBuffer);
 
   Serial.print("Data read: ");
   Serial.println(buffer);  //printing similar buffer
@@ -136,7 +156,7 @@ void writeData(uint32_t address, const char *data, int length) {
   SPI.transfer((address >> 8) & 0xFF);   // Address Middle Byte
   SPI.transfer(address & 0xFF);          // Address LSB
   for (int i = 0; i < length; i++) {
-    SPI.transfer(data[i]);               // Write data
+    SPI.transfer(data[i]);  // Write data
   }
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
@@ -157,7 +177,7 @@ void readData(uint32_t address, char *result, int length) {
   SPI.transfer((address >> 8) & 0xFF);   // Address Middle Byte
   SPI.transfer(address & 0xFF);          // Address LSB
   for (int i = 0; i < length; i++) {
-    result[i] = SPI.transfer(0x00);      // Read data
+    result[i] = SPI.transfer(0x00);  // Read data
   }
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
@@ -187,4 +207,17 @@ uint16_t manu_id() {
   chipID = (SPI.transfer(0x00) << 8) | SPI.transfer(0x00);
   digitalWrite(CS_PIN, HIGH);
   return chipID;
+}
+
+void json_print() {
+  StaticJsonDocument<200> doc;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  //doc["mac_id"] = macAddress.c_str();
+  doc["timestamp"] = millis();  // Use system time or add RTC if available
+
+  // Serialize JSON to a string
+  char jsonBuffer[100];
+  serializeJson(doc, jsonBuffer);
+  Serial.println(jsonBuffer);
 }
