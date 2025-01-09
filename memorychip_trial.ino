@@ -1,10 +1,12 @@
+//Note erasing before writting is an important parameter
+
+
+
 #include <SPI.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
-  
 // Pin Definitions
 #define CS_PIN 5  // Chip Select (CS) pin connected to the memory chip
-
 // Command Definitions for Winbond W25QXX
 #define CMD_READ_ID 0x90
 #define CMD_READ_DATA 0x03
@@ -16,80 +18,79 @@
 #define manufacturing_id 0x92
 // SPI Settings
 SPISettings spiSettings(1000000, MSBFIRST, SPI_MODE0);
+
 int temperature, humidity;
+uint32_t address;
+int num;
+
 void setup() {
   Serial.begin(115200);
-
   // Initialize SPI
   SPI.begin();
   pinMode(CS_PIN, OUTPUT);
-
   digitalWrite(CS_PIN, HIGH);  // Set CS high initially
-
   // Verify chip ID
   uint16_t chipID = readChipID();
   Serial.print("Winbond Chip ID: 0x");
   Serial.println(chipID, HEX);
-
   uint16_t chipID1 = readuniqid();
   Serial.print("Winbond Unique ID: 0x");
   Serial.println(chipID1, HEX);
-
   uint16_t chipID2 = manu_id();
   Serial.print("Winbond manu_f ID: 0x");
   Serial.println(chipID2, HEX);
-
   if (chipID == 0) {
     Serial.println("Failed to detect the memory chip!");
     while (1)
       ;
   }
-  humidity =10;
-  temperature=10;
+  humidity = 10;
+  temperature = 10;
+  Serial.println("Erasing sector...");
+  eraseSector(address);
+  uint32_t address = 0x00000;
+  num = 0;
 }
 
 void loop() {
-  String macAddress = WiFi.macAddress();
-  StaticJsonDocument<200> doc;
-  temperature = temperature+1;
-  humidity = humidity+1;
-  doc["temperature"] = temperature;
-  doc["humidity"] = humidity;
-  doc["mac_id"] = macAddress.c_str();
- // doc["timestamp"] = millis();  // Use system time or add RTC if available
+  char buffer[100];      //memory chip
+  char jsonBuffer[100];  // Serialize JSON to a string
 
-  // Serialize JSON to a string
-  char jsonBuffer[100];
-  serializeJson(doc, jsonBuffer);
-  Serial.println(jsonBuffer);
-   
-  //memory chip
-  uint32_t address = 0x00000;
-  //char dataToWrite[] = "Aartikanwar Solanki";
-  char buffer[100];
+  for (int i = 0; i < 10; i++) {
+    String macAddress = WiFi.macAddress();
+    StaticJsonDocument<200> doc;
+    temperature = temperature + 1;
+    humidity = humidity + 1;
 
-  //Serial.println("Erasing sector...");
-  //eraseSector(address);
+    doc["temperature"] = temperature;
+    doc["humidity"] = humidity;
+    doc["mac_id"] = macAddress.c_str();
 
-  Serial.println("Writing data...");
-  writeData(address, jsonBuffer, strlen(jsonBuffer));
+    //char jsonBuffer[100];  // Serialize JSON to a string
+    serializeJson(doc, jsonBuffer);
 
-  Serial.println("Reading data...");
-  readData(address, buffer, strlen(jsonBuffer));  //pasing empty buffer
+    Serial.println("Writing data...");
+    Serial.printf("at address %d\n", address);
+    writeData(address, jsonBuffer, strlen(jsonBuffer));
+    address = address + strlen(jsonBuffer);
+    delay(2000);
+  }
 
-  Serial.print("Data written: ");
-  Serial.println(jsonBuffer);
+  for (int i = 0; i < 10; i++) {
+    Serial.println("Reading data...");
+    Serial.printf("at address %d\n", address);
+    readData(address, buffer, strlen(jsonBuffer));  //pasing empty buffer
+    Serial.println(buffer);
+    address = address - strlen(jsonBuffer);
+    memset(buffer, 0, sizeof(buffer));
 
-  Serial.print("Data read: ");
-  Serial.println(buffer);  //printing similar buffer
-
-  delay(5000);
+    delay(10000);
+  }
 }
 
 // Function to Read Chip ID
 uint16_t readChipID() {
   uint16_t chipID = 0;
-
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_ID);
@@ -99,24 +100,19 @@ uint16_t readChipID() {
   chipID = (SPI.transfer(0x00) << 8) | SPI.transfer(0x00);
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-
   return chipID;
 }
-
 // Function to Read Status Register
 byte readStatus() {
   byte status;
-
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_STATUS);
   status = SPI.transfer(0x00);
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-
   return status;
 }
-
 // Function to Enable Write
 void enableWrite() {
   SPI.beginTransaction(spiSettings);
@@ -125,11 +121,9 @@ void enableWrite() {
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
 }
-
 // Function to Erase a Sector
 void eraseSector(uint32_t address) {
   enableWrite();  // Enable write operation
-
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_SECTOR_ERASE);
@@ -138,17 +132,14 @@ void eraseSector(uint32_t address) {
   SPI.transfer(address & 0xFF);          // Address LSB
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-
   // Wait for erase operation to complete
   while (readStatus() & 0x01) {
     delay(1);
   }
 }
-
 // Function to Write Data
 void writeData(uint32_t address, const char *data, int length) {
   enableWrite();
-
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_PAGE_PROGRAM);
@@ -160,13 +151,11 @@ void writeData(uint32_t address, const char *data, int length) {
   }
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-
   // Wait for write operation to complete
   while (readStatus() & 0x01) {
     delay(1);
   }
 }
-
 
 // Function to Read Data
 void readData(uint32_t address, char *result, int length) {
@@ -179,10 +168,10 @@ void readData(uint32_t address, char *result, int length) {
   for (int i = 0; i < length; i++) {
     result[i] = SPI.transfer(0x00);  // Read data
   }
+  result[length] = '\0';  // Null-terminate the string
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
 }
-
 uint16_t readuniqid() {
   uint16_t chipID = 0;
   digitalWrite(CS_PIN, LOW);
@@ -195,7 +184,6 @@ uint16_t readuniqid() {
   digitalWrite(CS_PIN, HIGH);
   return chipID;
 }
-
 uint16_t manu_id() {
   uint16_t chipID = 0;
   digitalWrite(CS_PIN, LOW);
@@ -208,14 +196,12 @@ uint16_t manu_id() {
   digitalWrite(CS_PIN, HIGH);
   return chipID;
 }
-
 void json_print() {
   StaticJsonDocument<200> doc;
   doc["temperature"] = temperature;
   doc["humidity"] = humidity;
   //doc["mac_id"] = macAddress.c_str();
   doc["timestamp"] = millis();  // Use system time or add RTC if available
-
   // Serialize JSON to a string
   char jsonBuffer[100];
   serializeJson(doc, jsonBuffer);
