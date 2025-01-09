@@ -1,17 +1,16 @@
 #include <SPI.h>
-
 // Pin Definitions
-#define CS_PIN 5 // Chip Select (CS) pin connected to the memory chip
+#define CS_PIN 5  // Chip Select (CS) pin connected to the memory chip
 
 // Command Definitions for Winbond W25QXX
-#define CMD_READ_ID        0x90
-#define CMD_READ_DATA      0x03
-#define CMD_WRITE_ENABLE   0x06
-#define CMD_PAGE_PROGRAM   0x02
-#define CMD_SECTOR_ERASE   0x20
-#define CMD_READ_STATUS    0x05
-#define read_unique_id     0x4B
-#define manufacturing_id   0x92
+#define CMD_READ_ID 0x90
+#define CMD_READ_DATA 0x03
+#define CMD_WRITE_ENABLE 0x06
+#define CMD_PAGE_PROGRAM 0x02
+#define CMD_SECTOR_ERASE 0x20
+#define CMD_READ_STATUS 0x05
+#define read_unique_id 0x4B
+#define manufacturing_id 0x92
 // SPI Settings
 SPISettings spiSettings(1000000, MSBFIRST, SPI_MODE0);
 
@@ -21,13 +20,14 @@ void setup() {
   // Initialize SPI
   SPI.begin();
   pinMode(CS_PIN, OUTPUT);
-  digitalWrite(CS_PIN, HIGH); // Set CS high initially
+
+  digitalWrite(CS_PIN, HIGH);  // Set CS high initially
 
   // Verify chip ID
   uint16_t chipID = readChipID();
   Serial.print("Winbond Chip ID: 0x");
   Serial.println(chipID, HEX);
-  
+
   uint16_t chipID1 = readuniqid();
   Serial.print("Winbond Unique ID: 0x");
   Serial.println(chipID1, HEX);
@@ -38,34 +38,32 @@ void setup() {
 
   if (chipID == 0) {
     Serial.println("Failed to detect the memory chip!");
-    while (1);
+    while (1)
+      ;
   }
 }
 
 void loop() {
-  uint32_t address = 0x200000; // Address to write and read
-  byte dataToWrite = 0x61;    // Data to write
-  byte dataRead;
+  uint32_t address = 0x00000;
+  char dataToWrite[] = "Aartikanwar Solanki";
+  char buffer[20];
 
-  // Erase sector
   Serial.println("Erasing sector...");
   eraseSector(address);
 
-  // Write data
   Serial.println("Writing data...");
-  writeData(address, dataToWrite);
+  writeData(address, dataToWrite, strlen(dataToWrite));
 
-  // Read data
   Serial.println("Reading data...");
-  dataRead = readData(address);
+  readData(address, buffer, strlen(dataToWrite));  //pasing empty buffer
 
-  // Display the result
-  Serial.print("Data written: 0x");
-  Serial.println(dataToWrite, HEX);
-  Serial.print("Data read: 0x");
-  Serial.println(dataRead, HEX);
+  Serial.print("Data written: ");
+  Serial.println(dataToWrite);
 
-  delay(5000); // Repeat every 5 seconds
+  Serial.print("Data read: ");
+  Serial.println(buffer);  //printing similar buffer
+
+  delay(5000);
 }
 
 // Function to Read Chip ID
@@ -75,7 +73,7 @@ uint16_t readChipID() {
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_ID);
-  SPI.transfer(0x00); // Dummy bytes
+  SPI.transfer(0x00);  // Dummy bytes
   SPI.transfer(0x00);
   SPI.transfer(0x00);
   chipID = (SPI.transfer(0x00) << 8) | SPI.transfer(0x00);
@@ -110,14 +108,14 @@ void enableWrite() {
 
 // Function to Erase a Sector
 void eraseSector(uint32_t address) {
-  enableWrite(); // Enable write operation
+  enableWrite();  // Enable write operation
 
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_SECTOR_ERASE);
-  SPI.transfer((address >> 16) & 0xFF); // Address MSB
-  SPI.transfer((address >> 8) & 0xFF);  // Address Middle Byte
-  SPI.transfer(address & 0xFF);         // Address LSB
+  SPI.transfer((address >> 16) & 0xFF);  // Address MSB
+  SPI.transfer((address >> 8) & 0xFF);   // Address Middle Byte
+  SPI.transfer(address & 0xFF);          // Address LSB
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
 
@@ -128,16 +126,18 @@ void eraseSector(uint32_t address) {
 }
 
 // Function to Write Data
-void writeData(uint32_t address, byte data) {
-  enableWrite(); // Enable write operation
+void writeData(uint32_t address, const char *data, int length) {
+  enableWrite();
 
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_PAGE_PROGRAM);
-  SPI.transfer((address >> 16) & 0xFF); // Address MSB
-  SPI.transfer((address >> 8) & 0xFF);  // Address Middle Byte
-  SPI.transfer(address & 0xFF);         // Address LSB
-  SPI.transfer(data);                   // Data byte
+  SPI.transfer((address >> 16) & 0xFF);  // Address MSB
+  SPI.transfer((address >> 8) & 0xFF);   // Address Middle Byte
+  SPI.transfer(address & 0xFF);          // Address LSB
+  for (int i = 0; i < length; i++) {
+    SPI.transfer(data[i]);               // Write data
+  }
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
 
@@ -147,28 +147,27 @@ void writeData(uint32_t address, byte data) {
   }
 }
 
-// Function to Read Data
-byte readData(uint32_t address) {
-  byte result;
 
+// Function to Read Data
+void readData(uint32_t address, char *result, int length) {
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(CMD_READ_DATA);
-  SPI.transfer((address >> 16) & 0xFF); // Address MSB
-  SPI.transfer((address >> 8) & 0xFF);  // Address Middle Byte
-  SPI.transfer(address & 0xFF);         // Address LSB
-  result = SPI.transfer(0x00);          // Dummy byte to read data
+  SPI.transfer((address >> 16) & 0xFF);  // Address MSB
+  SPI.transfer((address >> 8) & 0xFF);   // Address Middle Byte
+  SPI.transfer(address & 0xFF);          // Address LSB
+  for (int i = 0; i < length; i++) {
+    result[i] = SPI.transfer(0x00);      // Read data
+  }
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-
-  return result;
 }
 
-uint16_t readuniqid(){
+uint16_t readuniqid() {
   uint16_t chipID = 0;
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(read_unique_id);
-  SPI.transfer(0x00); // Dummy bytes
+  SPI.transfer(0x00);  // Dummy bytes
   SPI.transfer(0x00);
   SPI.transfer(0x00);
   SPI.transfer(0x00);
@@ -177,11 +176,11 @@ uint16_t readuniqid(){
   return chipID;
 }
 
-uint16_t manu_id(){
+uint16_t manu_id() {
   uint16_t chipID = 0;
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(manufacturing_id);
-  SPI.transfer(0x00); // Dummy bytes
+  SPI.transfer(0x00);  // Dummy bytes
   SPI.transfer(0x00);
   SPI.transfer(0x00);
   SPI.transfer(0x00);
